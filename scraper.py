@@ -1,53 +1,88 @@
 import collections
 import re
 from bs4 import BeautifulSoup
-from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
 
 
-def clean_text(text): ##define clean text
-    text = text.lower().strip() ## make lower case
-    text = re.sub(r"[^\w\s]", "", text) ## get rid of ! . etc
+def clean_text(text):
+    """Converts text to lowercase and strips out punctuation."""
+    text = text.lower().strip()
+    text = re.sub(r"[^\w\s]", "", text)
     return text
 
 
-def analyze_comments(url, target_keywords): ##building a functiom
+async def analyze_comments(url, target_keywords):
     keyword_counter = collections.Counter()
     matched_comments = []
 
-    #ENGAGE JS PLAYWRIGHT TOOL ---
-    with sync_playwright() as p:
+    async with async_playwright() as p:
         try:
-            # Run headless=True means no physical popup window
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
+            #User-Agent     
+            user_agent = (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/122.0.0.0 Safari/537.36"
+            )
 
-            print(f"📡 Launching automated browser to load: {url}...")
-            # Go to the URL and wait up to 30 seconds
-            page.goto(url, wait_until="networkidle", timeout=30000)
+            # 2. Launch Chromium with automation bypass arguments
+            browser = await p.chromium.launch(
+                headless=True,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-sandbox",
+                    "--disable-http2",  # Keeps connection handling on stable protocol rules
+                ],
+            )
 
-            # Force comments to render
-            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            page.wait_for_timeout(2000)  # Wait 2 seconds for visual updates
+            # 3. removes the "HeadlessChrome" text that triggers the CBC's firewall block
+            extra_headers = {
+                "sec-ch-ua": '"Chromium";v="122", "Not(A:Brand)";v="24", "Google Chrome";v="122"',
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": '"Windows"',
+                "upgrade-insecure-requests": "1",
+            }
 
-            # Extract rendered HTML code
-            html_content = page.content()
-            browser.close()
+            context = await browser.new_context(
+                user_agent=user_agent,
+                viewport={"width": 1280, "height": 720},
+                extra_http_headers=extra_headers,  # Inject the squeaky-clean headers here
+            )
+            
+            page = await context.new_page()
+
+            print(f"📡 Launching clean-signature browser to load: {url}...")
+
+            await page.goto(url, wait_until="commit", timeout=30000)
+
+  
+            await page.wait_for_timeout(3000)
+
+            # Gather up the clean HTML string 
+            html_content = await page.content()
+            await browser.close()
+
         except Exception as e:
-            print(f"Browser execution failed: {e}") ##feedback
+            print(f"Browser execution failed: {e}")
             return None
 
-    # --- PROCESS THE EXTRACTED HTML FOR KEYWORDS ---
+    # 4. Extract data using BeautifulSoup
     soup = BeautifulSoup(html_content, "html.parser")
-    comment_elements = soup.find_all(["p", "span", "div", "li"]) ## grab all containers (paragraph, spans, lists, divisions)
+    potential_elements = soup.find_all(["p", "div", "span", "h3"])
+
     seen_texts = set()
 
-    for element in comment_elements:
+    for element in potential_elements:
         original_text = element.text.strip()
+
         if (
             not original_text
-            or len(original_text) < 5
+            or len(original_text) < 12
             or original_text in seen_texts
         ):
+            continue
+
+        # Skip main site menu structures to keep research results highly relevant
+        if any(skip in original_text for skip in ["Skip to Main Content", "Accessibility Help", "All rights reserved"]):
             continue
 
         seen_texts.add(original_text)
@@ -64,10 +99,9 @@ def analyze_comments(url, target_keywords): ##building a functiom
         if found_in_this_comment:
             matched_comments.append(
                 {
-                    "text": original_text,
+                    "text": original_text[:350] + ("..." if len(original_text) > 350 else ""),
                     "matched_keywords": list(set(found_in_this_comment)),
                 }
             )
 
-    # shiny app
     return matched_comments, keyword_counter
