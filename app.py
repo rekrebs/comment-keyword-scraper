@@ -45,7 +45,7 @@ with ui.layout_columns(col_widths=[4, 8]):
 
     # Grid2: Output
     with ui.card():
-        ui.card_header("📝 Matched Content Strings")
+        ui.card_header(" Matched Content Strings")
 
         @render.text
         def display_comments_log():
