@@ -6,12 +6,12 @@ from shiny.express import ui, input
 from scraper import analyze_comments
 
 # 1. Global Page Styling
-ui.page_opts(title="Keyword Comment Analyzer Dashboard", fillable=True)
+ui.page_opts(title="Keyword Comment Analyzer", fillable=True)
 
 # 2. Creating Navigator
 with ui.sidebar(title="Scraper Parameters"):
-    ui.input_text("url", "Target Webpage URL:", value="https://ycombinator.com")
-    ui.input_text("keywords", "Keywords to count (comma-split):", value="Python, AI, Code")
+    ui.input_text("url", "Target Webpage URL:", value=" Your URL")
+    ui.input_text("keywords", "Keywords to count (comma-split):", value="integration, zufrieden, unzufrieden")
     ui.input_action_button("run", "Run Analysis Engine", class_="btn-success w-100")
 
 # 3. Reactive Processor Box
