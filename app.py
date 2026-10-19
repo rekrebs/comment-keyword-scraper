@@ -6,7 +6,7 @@ from shiny.express import ui, input
 from scraper import analyze_comments
 
 # 1. Global Page Styling
-ui.page_opts(title="Keyword Comment Analyzer", fillable=True)
+ui.page_opts(title="Keyword Comment Analyzer Dashboard", fillable=True)
 
 # 2. Creating Navigator
 with ui.sidebar(title="Scraper Parameters"):
